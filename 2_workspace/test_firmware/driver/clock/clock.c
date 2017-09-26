@@ -23,8 +23,11 @@
 extern void hwClockConfig (void)
 {
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_SRAM, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);
 }
 /******************************************************************************/
 /**!                          LOCAL VARIABLES                                 */
