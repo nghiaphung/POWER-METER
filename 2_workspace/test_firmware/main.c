@@ -17,27 +17,57 @@
 #include "system_stm32f10x.h"
 #include "driver/clock/clock.h"
 #include "driver/stpm33/stpm33.h"
+#include "driver/serial/serial.h"
+#include "source/fsm.h"
+/******************************************************************************/
+/**!                            LOCAL SYMBOLS                                 */
+/******************************************************************************/
+
+/******************************************************************************/
+/**!                         EXPORTED VARIABLES                               */
+/******************************************************************************/
+
+/******************************************************************************/
+/**!                          LOCAL VARIABLES                                 */
+/******************************************************************************/
+
+/******************************************************************************/
+/**!                    LOCAL FUNCTIONS PROTOTYPES                            */
+/******************************************************************************/
+void hwSetup(void);
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
 /******************************************************************************/
-int main (int argc, char* argv[])
+
+int main (void)
 {
-    /* To avoid compiler error/warning */
-    int temp = argc + (uint32_t)argv; temp++;
-    uint32_t tempp;
-    uint8_t a;
-    SystemInit();
-    hwClockConfig ();
-    Led_Init();
-    Led_SetLevel(LED_R, LED_LEVEL_ENABLE);
-    Led_SetLevel(LED_G, LED_LEVEL_ENABLE);
-    Led_SetLevel(LED_Y, LED_LEVEL_ENABLE);
-    Stpm33_Init();
-    tempp = Stpm33_ReadRegister(0x00);
-    a = tempp & 0xFF;
-    if (a != 0x04)
-        Led_SetLevel(LED_R, LED_LEVEL_DISABLE);
+    hwSetup();
     while(1)
-    {}
+    {
+        fsm_Update();
+        fsm_Run();
+    }
+    
+}
+
+/******************************************************************************/
+/**!                          LOCAL FUNCTIONS                                 */
+/******************************************************************************/
+void hwSetup(void)
+{
+    serial_t debug_serial;    
+    debug_serial.baudrate = SERIAL_BAUDRATE_115200;
+    debug_serial.callback = Serial_Debug_Update;
+    debug_serial.usart    = Serial_Debug;
+    
+    SystemInit();
+    /* Configure clock for peripherals */
+    hwClockConfig();
+    /* Initialize LEDs driver */
+    Led_Init();
+    /* Initialize STPM33 driver */
+    Stpm33_Init();
+    /* Initialize Serial drivers */
+    Serial_Init(&debug_serial);
     
 }

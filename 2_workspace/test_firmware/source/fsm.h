@@ -1,42 +1,22 @@
 /*******************************************************************************
- * @filename: 
- * @Author	: 
- * @Date	: 
- * @Email	: 
+ * @filename: StateMachine.h
+ * @Author	: nghiaphung
+ * @Date	: 27/9/2017
+ * @Email	: ducnghia318@gmail.com
  ******************************************************************************/
-#ifndef SERIAL_H_
-#define SERIAL_H_
-
+#ifndef STATE_MACHINE_H_
+#define STATE_MACHINE_H_
+ 
 /******************************************************************************/
 /*                               INCLUDE                                      */
 /******************************************************************************/
-#include "stm32f10x.h"
+#include "string.h"
+#include "../driver/serial/serial.h"
+#include "../driver/stpm33/stpm33.h"
+#include "../driver/led/led.h"
 /******************************************************************************/
 /*                             PUBLIC TYPEDEF                                 */
 /******************************************************************************/
-typedef enum
-{
-    Serial_Debug    = 1,
-    Serial_Wifi     = 2,
-    Serial_PLC      = 3,
-}USARTx_t;
-typedef enum
-{
-	SERIAL_BAUDRATE_115200 = 115200UL,
-	SERIAL_BAUDRATE_460800 = 460800UL,
-	SERIAL_BAUDRATE_921600 = 921600UL
-}baudrate_t;
-
-typedef void (*serial_callback_t)(uint8_t byte);
-
-typedef struct
-{
-    USARTx_t          usart;       
-	baudrate_t        baudrate;
-	serial_callback_t callback;
-}serial_t;
-
-
 
 /******************************************************************************/
 /**!                            PUBLIC SYMBOLS                                */
@@ -53,11 +33,9 @@ typedef struct
 /******************************************************************************/
 /**!                    PUBLIC FUNCTIONS PROTOTYPES                           */
 /******************************************************************************/
-void Serial_Init(serial_t* serial);
-void Serial_SendByte(uint8_t byte);
-void Serial_Send(char* ptr, int len);
-int Serial_Available(void);
-uint8_t Serial_ReadRxBuffer(void);
+void Serial_Debug_Update(uint8_t byte);
+void fsm_Run (void);
+void fsm_Update (void);
 #endif 
 /******************************************************************************/
 /**!                           END OF FILE                                    */
