@@ -415,6 +415,11 @@
               <FileType>1</FileType>
               <FilePath>.\driver\clock\clock.c</FilePath>
             </File>
+            <File>
+              <FileName>timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\driver\timer\timer.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -439,13 +444,6 @@
         </Group>
         <Group>
           <GroupName>::CMSIS</GroupName>
-          <Files>
-            <File>
-              <FileName>StateMachine.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\source\StateMachine.c</FilePath>
-            </File>
-          </Files>
         </Group>
         <Group>
           <GroupName>::Device</GroupName>
