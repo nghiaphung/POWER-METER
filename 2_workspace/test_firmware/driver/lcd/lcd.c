@@ -14,6 +14,16 @@
 /******************************************************************************/
 /**!                            LOCAL TYPEDEF                                 */
 /******************************************************************************/
+typedef struct {
+	uint8_t DisplayControl;
+	uint8_t DisplayFunction;
+	uint8_t DisplayMode;
+	uint8_t Rows;
+	uint8_t Cols;
+	uint8_t currentX;
+	uint8_t currentY;
+} LCD_Options_t;
+
 #define LCD_DB0_PIN           GPIO_Pin_1
 #define LCD_DB1_PIN           GPIO_Pin_2
 #define LCD_DB2_PIN           GPIO_Pin_3
@@ -42,7 +52,40 @@
 
 #define  SYS_TIMER_CLK        (1000000UL)
 
+/* Commands*/
+#define LCD_CLEARDISPLAY        0x01
+#define LCD_RETURNHOME          0x02
+#define LCD_ENTRYMODESET        0x04
+#define LCD_DISPLAYCONTROL      0x08
+#define LCD_CURSORSHIFT         0x10
+#define LCD_FUNCTIONSET         0x20
+#define LCD_SETCGRAMADDR        0x40
+#define LCD_SETDDRAMADDR        0x80
 
+/* Flags for display entry mode */
+#define LCD_ENTRYRIGHT          0x00
+#define LCD_ENTRYLEFT           0x02
+#define LCD_ENTRYSHIFTINCREMENT 0x01
+#define LCD_ENTRYSHIFTDECREMENT 0x00
+
+/* Flags for display on/off control */
+#define LCD_DISPLAYON           0x04
+#define LCD_CURSORON            0x02
+#define LCD_BLINKON             0x01
+
+/* Flags for display/cursor shift */
+#define LCD_DISPLAYMOVE         0x08
+#define LCD_CURSORMOVE          0x00
+#define LCD_MOVERIGHT           0x04
+#define LCD_MOVELEFT            0x00
+
+/* Flags for function set */
+#define LCD_8BITMODE            0x10
+#define LCD_4BITMODE            0x00
+#define LCD_2LINE               0x08
+#define LCD_1LINE               0x00
+#define LCD_5x10DOTS            0x04
+#define LCD_5x8DOTS             0x00
 /******************************************************************************/
 /**!                            LOCAL SYMBOLS                                 */
 /******************************************************************************/
@@ -54,36 +97,147 @@
 /******************************************************************************/
 /**!                          LOCAL VARIABLES                                 */
 /******************************************************************************/
-
+static LCD_Options_t    LCD_Opts;
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
-void LCD_SetDB0(void);
-void LCD_SetDB1(void);
-void LCD_SetDB2(void);
-void LCD_SetDB3(void);
-void LCD_SetDB4(void);
-void LCD_SetDB5(void);
-void LCD_SetDB6(void);
-void LCD_SetDB7(void);
-void LCD_ResetDB0 (void);
-void LCD_ResetDB1 (void);
-void LCD_ResetDB2 (void);
-void LCD_ResetDB3 (void);
-void LCD_ResetDB4 (void);
-void LCD_ResetDB5 (void);
-void LCD_ResetDB6 (void);
-void LCD_ResetDB7 (void);
-void LCD_SetEN (void);
-void LCD_ResetEN (void);
-void LCD_SetRW (void);
-void LCD_ResetRW (void);
-void LCD_SetRS (void);
-void LCD_ResetRS (void);
+void LCD_DelayUs (uint32_t pUs);
+void LCD_Cmd4bit (uint8_t pCmd);
+void LCD_Cmd (uint8_t pCmd);
+void LCD_ENBlink (void);
+void LCD_GPIOInit (void);
+void LCD_DisplayOn (void);
+void LCD_SetCursor (uint8_t pRow, uint8_t pCol);
+void LCD_Data (uint8_t data);
+void delay1 (uint32_t us);
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
 /******************************************************************************/
+
+
 void LCD_Init (void)
+{
+    LCD_GPIOInit();
+	/* At least 40ms */    
+    //LCD_DelayUs(45000);
+    delay1(9000);
+    /* Set LCD width and height */
+    LCD_Opts.Cols = 20;
+    LCD_Opts.Rows = 4;
+	/* Set cursor pointer to beginning for LCD */
+    LCD_Opts.currentX = 0;
+    LCD_Opts.currentY = 0;
+    
+    LCD_Opts.DisplayFunction = LCD_4BITMODE | LCD_5x8DOTS | LCD_2LINE;
+    
+	/* Try to set 4bit mode */
+    LCD_Cmd4bit(0x03);
+    //LCD_DelayUs(4500);
+    delay1(900);
+    LCD_Cmd4bit(0x03);
+    //LCD_DelayUs(4500);
+    delay1(900);
+    
+    LCD_Cmd4bit(0x03);
+    //LCD_DelayUs(4500);
+    delay1(900);
+	/* Set 4-bit interface */
+    LCD_Cmd4bit(0x02);
+    //LCD_DelayUs(100);
+    delay1(20);
+	/* Set # lines, font size, etc. */
+    LCD_Cmd(LCD_FUNCTIONSET | LCD_Opts.DisplayFunction);
+ 	/* Turn the display on with no cursor or blinking default */
+    LCD_Opts.DisplayControl = LCD_DISPLAYON;
+    LCD_DisplayOn();
+	/* Clear lcd */
+    LCD_Clear();
+	/* Default font directions */
+    LCD_Opts.DisplayMode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
+    LCD_Cmd(LCD_ENTRYMODESET | LCD_Opts.DisplayMode);
+    //LCD_DelayUs(4500);
+    delay1(900);
+}
+
+void LCD_Clear(void)
+{
+    LCD_Cmd(LCD_CLEARDISPLAY);
+    //LCD_DelayUs(3000);
+    delay1(600);
+}
+
+void LCD_Puts(uint8_t x, uint8_t y, char* str)
+{
+    LCD_SetCursor(x, y);
+    while(*str)
+    {
+        if(LCD_Opts.currentX >= LCD_Opts.Cols)
+        {
+            LCD_Opts.currentX = 0;
+            LCD_Opts.currentY++;
+            LCD_SetCursor(LCD_Opts.currentX, LCD_Opts.currentY);
+        }
+        if (*str == '\n')
+        {
+            LCD_Opts.currentY++;
+            LCD_SetCursor(LCD_Opts.currentX, LCD_Opts.currentY);
+        }
+        else if (*str == '\r')
+        {
+            LCD_SetCursor(0, LCD_Opts.currentY);
+        }
+        else {
+            LCD_Data(*str);
+            LCD_Opts.currentX++;
+        }
+        str++;
+    }
+}
+/******************************************************************************/
+/**!                          LOCAL FUNCTIONS                                 */
+/******************************************************************************/
+void LCD_DelayUs (uint32_t pUs)
+{
+    RCC_ClocksTypeDef           RCC_ClockStatus    = {0};
+    
+    /* get clock status */
+    RCC_GetClocksFreq(&RCC_ClockStatus);
+    uint32_t temp;
+    temp = (RCC_ClockStatus.SYSCLK_Frequency / (SYS_TIMER_CLK))*pUs;
+    temp = SystemCoreClock;
+    while(temp--);
+}
+
+void LCD_Cmd4bit (uint8_t pCmd)
+{
+    GPIO_WriteBit(LCD_DB7_PORT, LCD_DB7_PIN, (BitAction)(pCmd & 0x08));
+    GPIO_WriteBit(LCD_DB6_PORT, LCD_DB6_PIN, (BitAction)(pCmd & 0x04));
+    GPIO_WriteBit(LCD_DB7_PORT, LCD_DB5_PIN, (BitAction)(pCmd & 0x02));
+    GPIO_WriteBit(LCD_DB4_PORT, LCD_DB4_PIN, (BitAction)(pCmd & 0x01));
+    LCD_ENBlink();
+}
+
+void LCD_Cmd (uint8_t pCmd)
+{
+    /* command mode */
+    GPIO_ResetBits(LCD_RS_PORT, LCD_RS_PIN);
+    /* high nibble */
+    LCD_Cmd4bit(pCmd >> 4);
+    /* low nibble */
+    LCD_Cmd4bit(pCmd & 0x0F);
+}
+
+void LCD_ENBlink (void)
+{
+    GPIO_SetBits(LCD_EN_PORT, LCD_EN_PIN);
+    //LCD_DelayUs(50);
+    delay1(10);
+    GPIO_ResetBits(LCD_EN_PORT, LCD_EN_PIN);
+    //LCD_DelayUs(50);
+    delay1(10);
+}
+
+void LCD_GPIOInit (void)
 {
     GPIO_InitTypeDef      GPIO_InitStruct;
     GPIO_InitStruct.GPIO_Mode    = GPIO_Mode_Out_PP;
@@ -121,128 +275,59 @@ void LCD_Init (void)
     /* initialize EN */
     GPIO_InitStruct.GPIO_Pin     = LCD_EN_PIN;
     GPIO_Init(LCD_EN_PORT, &GPIO_InitStruct);
+    /* set all pin to low */
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_DB0_PORT, LCD_DB0_PIN);
+    GPIO_ResetBits(LCD_RW_PORT, LCD_RW_PIN);
+    GPIO_ResetBits(LCD_RS_PORT, LCD_RS_PIN);
+    GPIO_ResetBits(LCD_EN_PORT, LCD_EN_PIN);
 }
 
-
-/******************************************************************************/
-/**!                          LOCAL FUNCTIONS                                 */
-/******************************************************************************/
-void LCD_DelayUs (uint32_t pUs)
+void LCD_DisplayOn (void)
 {
-    RCC_ClocksTypeDef           RCC_ClockStatus    = {0};
-    
-    /* get clock status */
-    RCC_GetClocksFreq(&RCC_ClockStatus);
-    pUs = RCC_ClockStatus.SYSCLK_Frequency / (SYS_TIMER_CLK*3);
-    for (uint32_t i; i < pUs; i++);
+    LCD_Opts.DisplayControl |= LCD_DISPLAYON;
+    LCD_Cmd(LCD_DISPLAYCONTROL | LCD_Opts.DisplayControl);
 }
 
-void LCD_SetDB0(void)
+void LCD_SetCursor (uint8_t pCol, uint8_t pRow)
 {
-    GPIO_WriteBit(LCD_DB0_PORT, LCD_DB0_PIN, Bit_SET);
+    uint8_t row_offset[4] = {0x00, 0x40, 0x14, 0x54};
+    /* go to beggining */
+    if (pRow >= LCD_Opts.Rows)
+    {
+        pRow = 0;
+    }
+    /* set current col and row */
+    LCD_Opts.currentX = pCol;
+    LCD_Opts.currentY = pRow;
+    /* set location address */
+    LCD_Cmd(LCD_SETDDRAMADDR | (pCol + row_offset[pRow]));
 }
 
-void LCD_SetDB1(void)
+void LCD_Data (uint8_t data)
 {
-    GPIO_WriteBit(LCD_DB1_PORT, LCD_DB1_PIN, Bit_SET);
+    /* data mode */
+    GPIO_SetBits(LCD_RS_PORT, LCD_RS_PIN);
+    /* high nibble */
+    LCD_Cmd4bit(data >> 4);
+    /* low nibble */
+    LCD_Cmd4bit(data & 0x0F);
 }
 
-void LCD_SetDB2(void)
+void delay1 (uint32_t us)
 {
-    GPIO_WriteBit(LCD_DB2_PORT, LCD_DB2_PIN, Bit_SET);
+    SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
+    uint32_t temp;
+    temp = 72 *us;
+    SysTick->LOAD = temp;
+    SysTick->CTRL = 0xFFFFFFF5;
+    while(SysTick->VAL);
+    SysTick->CTRL = 0xFFFFFFF0;
 }
 
-void LCD_SetDB3(void)
-{
-    GPIO_WriteBit(LCD_DB3_PORT, LCD_DB3_PIN, Bit_SET);
-}
-
-void LCD_SetDB4(void)
-{
-    GPIO_WriteBit(LCD_DB4_PORT, LCD_DB4_PIN, Bit_SET);
-}
-
-void LCD_SetDB5(void)
-{
-    GPIO_WriteBit(LCD_DB5_PORT, LCD_DB5_PIN, Bit_SET);
-}
-
-void LCD_SetDB6(void)
-{
-    GPIO_WriteBit(LCD_DB6_PORT, LCD_DB6_PIN, Bit_SET);
-}
-
-void LCD_SetDB7(void)
-{
-    GPIO_WriteBit(LCD_DB7_PORT, LCD_DB7_PIN, Bit_SET);
-}
-
-void LCD_ResetDB0 (void)
-{
-    GPIO_WriteBit(LCD_DB0_PORT, LCD_DB0_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB1 (void)
-{
-    GPIO_WriteBit(LCD_DB1_PORT, LCD_DB1_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB2 (void)
-{
-    GPIO_WriteBit(LCD_DB2_PORT, LCD_DB2_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB3 (void)
-{
-    GPIO_WriteBit(LCD_DB3_PORT, LCD_DB3_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB4 (void)
-{
-    GPIO_WriteBit(LCD_DB4_PORT, LCD_DB4_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB5 (void)
-{
-    GPIO_WriteBit(LCD_DB5_PORT, LCD_DB5_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB6 (void)
-{
-    GPIO_WriteBit(LCD_DB6_PORT, LCD_DB6_PIN, Bit_RESET);
-}
-
-void LCD_ResetDB7 (void)
-{
-    GPIO_WriteBit(LCD_DB7_PORT, LCD_DB7_PIN, Bit_RESET);
-}
-
-void LCD_SetEN (void)
-{
-    GPIO_WriteBit(LCD_EN_PORT, LCD_EN_PIN, Bit_SET);
-}
-
-void LCD_ResetEN (void)
-{
-    GPIO_WriteBit(LCD_EN_PORT, LCD_EN_PIN, Bit_RESET);
-}
-
-void LCD_SetRW (void)
-{
-    GPIO_WriteBit(LCD_RW_PORT, LCD_RW_PIN, Bit_SET);
-}
-
-void LCD_ResetRW (void)
-{
-    GPIO_WriteBit (LCD_RW_PORT, LCD_RW_PIN, Bit_RESET);
-}
-
-void LCD_SetRS (void)
-{
-    GPIO_WriteBit(LCD_RS_PORT, LCD_RS_PIN, Bit_SET);
-}
-
-void LCD_ResetRS (void)
-{
-    GPIO_WriteBit(LCD_RS_PORT, LCD_RS_PIN, Bit_RESET);
-}

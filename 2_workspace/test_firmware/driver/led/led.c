@@ -30,6 +30,7 @@
 /******************************************************************************/
 extern void Led_Init (void)
 {
+    
     /* user data configuration */
     GPIO_InitTypeDef GPIO_InitStruct;
     /* data initialization for GPIO */
@@ -44,6 +45,10 @@ extern void Led_Init (void)
     /* initialize LED_Y */
     GPIO_InitStruct.GPIO_Pin   = LED_Y_PIN;
     GPIO_Init(LED_Y_PORT, &GPIO_InitStruct);
+    Led_SetLevel(LED_G, LED_LEVEL_ENABLE);
+    Led_SetLevel(LED_Y, LED_LEVEL_ENABLE);
+    Led_SetLevel(LED_R, LED_LEVEL_ENABLE);
+    
 }
 
 extern void Led_SetLevel (led_channel_t pLed, led_level_t pLevel)
