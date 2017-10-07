@@ -32,6 +32,11 @@
 /******************************************************************************/
 void Stpm33_Init(void);
 uint32_t	Stpm33_ReadRegister(uint8_t pAddr);
+uint32_t Stpm33_ReadVol (void);
+uint32_t Stpm33_ReadCur (void);
+uint32_t Stpm33_ReadPowerActive (void);
+uint32_t Stpm33_ReadPowerReactive (void);
+int Stpm33_SetAutoLatch (void);
 #endif 
 /******************************************************************************/
 /**!                           END OF FILE                                    */

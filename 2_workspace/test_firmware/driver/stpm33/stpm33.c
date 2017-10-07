@@ -3,6 +3,7 @@
  * @Author	: nghiaphung
  * @Date	: 24/9/2017
  * @Email	: ducnghia318@gmail.com
+ * @referrence : src firmware STPM3x aval by st, datasheet and app note of STPM33
  */
  
 /******************************************************************************/
@@ -28,7 +29,29 @@
 #define STPM33_FRAME_LEN       (5)
 
 /* registers */
+/* refer to STPM3x datasheet and AN470 */
+#define STPM_DFE_CR_1_ADDRESS          0x18 //GAIN1
+#define STPM_DFE_CR_2_ADDRESS          0x1A //GAIN2
+#define STPM_DSP_CR_3_ADDRESS          0x04 //auto latch
+#define STPM_DSP_CR_5_ADDRESS          0x08 //CHV1
+#define STPM_DSP_CR_6_ADDRESS          0x0A //CHC1
+#define STPM_DSP_CR_7_ADDRESS          0x0C //CHV2
+#define STPM_DSP_CR_8_ADDRESS          0x0E //CHC2
+#define STPM_DSP_REG_14_ADDRESS        0x48 //C1 RMS and V1 RMS
+#define STPM_DSP_REG_15_ADDRESS        0x4A //C2 RMS and V2 RMS
+#define STPM_PH1_REG_5_ADDRESS         0x5C //PH1 active power
+#define STPM_PH1_REG_7_ADDRESS         0x60 //PH1 reactive power
 
+#define STPM_SUBMASK_POWER_ACTIVE      ((uint32_t)0x1FFFFFFF)
+#define STPM_SUBMASK_POWER_REACTIVE    ((uint32_t)0x1FFFFFFF)
+#define STPM_SUBMASK_CURRENT_RMS       ((uint32_t)0xFFFF8000)
+#define STPM_SUBMASK_VOLTAGE_RMS       ((uint32_t)0x00007FFF)
+#define STPM_CURRENT_SHIFT             15
+
+/* refer to source code metrology of stpm33 */
+#define STPM_VOL_FACT_CH1              116247
+#define STPM_CUR_FACT_CH1              25934
+#define STPM_POW_FACT_CH1              30154605
 /******************************************************************************/
 /**!                            LOCAL SYMBOLS                                 */
 /******************************************************************************/
@@ -104,10 +127,10 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
     uint8_t vBufferRecv[5];
 	uint32_t vTemp = 0;
 	uint8_t i = 0;
-	vBuffer[0] = pAddr;
-	vBuffer[1]	= 0xFF;
-	vBuffer[2]	= 0xAA;
-	vBuffer[3]	= 0x55;
+	vBuffer[0]  = pAddr;
+	vBuffer[1]	= 0xFF; // dummy write address
+	vBuffer[2]	= 0xFF;
+	vBuffer[3]	= 0xFF;
 	vBuffer[4]	= CalcCRC8(vBuffer);
 	Stpm33_Enable();
 	delay(350);
@@ -116,10 +139,10 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	}
 	Stpm33_Disable();
 	delay(350*2);
-	vBuffer[0] = 0xFF;
-	vBuffer[1]	= 0xFF;
-	vBuffer[2]	= 0xAA;
-	vBuffer[3]	= 0x55;
+	vBuffer[0]  = 0xFF; // dummy read address
+	vBuffer[1]	= 0xFF; // dummy write address
+	vBuffer[2]	= 0xFF; // dummy data
+	vBuffer[3]	= 0xFF; // dummy data
 	vBuffer[4]	= CalcCRC8(vBuffer);
 	Stpm33_Enable();
 	delay(350);
@@ -132,7 +155,123 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	return vTemp;
 }
 
+uint32_t Stpm33_ReadVol (void)
+{
+    uint32_t raw_data;
+    uint64_t cal_data;
+    /* read data from DSP_REG 14 */
+    raw_data = Stpm33_ReadRegister(STPM_DSP_REG_14_ADDRESS);
+    /* raw voltage read from STPM33 */
+    raw_data = raw_data & STPM_SUBMASK_VOLTAGE_RMS;
+    /* Calculate real values with factors */
+    cal_data = (uint64_t)(raw_data * STPM_VOL_FACT_CH1);
+    /* multiply by 10 to have mili */
+    cal_data = cal_data * 10;
+    /* Shift calcul result to 15 bits ( resolution of Reg inside metrology block)*/
+    cal_data >>= 15;
+    return (uint32_t)cal_data;
+}
  
+uint32_t Stpm33_ReadCur (void)
+{
+    uint32_t raw_data;
+    uint64_t cal_data;
+    /* read data from DSP_REG 14 */
+    raw_data = Stpm33_ReadRegister(STPM_DSP_REG_14_ADDRESS);
+    /* raw voltage read from STPM33 */
+    raw_data = (raw_data & STPM_SUBMASK_CURRENT_RMS) >> STPM_CURRENT_SHIFT;
+    /* Calculate real values with factors */
+    cal_data = (uint64_t)(raw_data * STPM_CUR_FACT_CH1);
+    /* multiply by 10 to have mili */
+    cal_data = cal_data * 10;
+    /* Shift calcul result to 17 bits ( resolution of Reg inside metrology block)*/
+    cal_data >>= 17;  
+    return (uint32_t)cal_data;
+    /* Calculate real values with factors */
+    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+}
+
+uint32_t Stpm33_ReadPowerActive (void)
+{
+    uint32_t raw_data;
+    uint64_t cal_data; 
+    /* read data from PH1_REG5 */
+    raw_data = Stpm33_ReadRegister(STPM_PH1_REG_5_ADDRESS);
+    /* raw active power read from STPM33 */
+    raw_data = raw_data & STPM_SUBMASK_POWER_ACTIVE;
+    raw_data <<= 4;  // handle sign extension
+    raw_data >>= 4;
+    /* Calculate real values with factors */
+    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+    /* multiply by 10 to have mili */
+    cal_data = cal_data * 10;
+    /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
+    cal_data >>= 28;
+    return (uint32_t)cal_data;     
+}
+
+uint32_t Stpm33_ReadPowerReactive (void)
+{
+    uint32_t raw_data;
+    uint64_t cal_data; 
+    /* read data from PH1_REG5 */
+    raw_data = Stpm33_ReadRegister(STPM_PH1_REG_7_ADDRESS);
+    /* raw active power read from STPM33 */
+    raw_data = raw_data & STPM_SUBMASK_POWER_REACTIVE;
+    raw_data <<= 4;  // handle sign extension
+    raw_data >>= 4;
+    /* Calculate real values with factors */
+    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+    /* multiply by 10 to have mili */
+    cal_data = cal_data * 10;
+    /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
+    cal_data >>= 28;
+    return (uint32_t)cal_data;     
+}
+
+int Stpm33_SetAutoLatch (void)
+{
+    uint8_t vBuffer[5];
+    uint8_t vBufferRecv[5];
+    uint8_t i = 0;
+    uint32_t vTemp;
+    vBuffer[0] = 0xFF;
+    vBuffer[1] = 0x05; //address of bit [31:16] of dsp_cr3
+    vBuffer[2] = 0x80; // low byte of data want to write
+    vBuffer[3] = 0x00; // high byte of data want to write
+	vBuffer[4]	= CalcCRC8(vBuffer);
+	Stpm33_Enable();
+	delay(350);
+	for (i = 0; i < 5; i++){
+			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
+	}
+	Stpm33_Disable();
+	delay(350*2);
+
+    /* read dsp_cr3 for checking */
+    vBuffer[0] = STPM_DSP_CR_3_ADDRESS;
+	vBuffer[1]	= 0xFF; // dummy write address
+	vBuffer[2]	= 0xFF; // dummy data
+	vBuffer[3]	= 0xFF; // dummy data
+	vBuffer[4]	= CalcCRC8(vBuffer);
+	Stpm33_Enable();
+	delay(350);
+	for (i = 0; i < 5; i++){
+			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
+	}
+	Stpm33_Disable();
+    
+	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
+    
+    if (vTemp == 0x008004E0)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */
 /******************************************************************************/
