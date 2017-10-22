@@ -10,6 +10,7 @@
 /**!                               INCLUDE                                    */
 /******************************************************************************/
 #include "stpm33.h"
+#include "../lcd/lcd.h"
 /******************************************************************************/
 /**!                            LOCAL TYPEDEF                                 */
 /******************************************************************************/
@@ -18,12 +19,14 @@
 #define STPM33_MOSI_PORT       GPIOA
 #define STPM33_MISO_PORT       GPIOA
 #define STPM33_SYN_PORT        GPIOB
+#define STPM33_EN_PORT         GPIOA
 
 #define STPM33_CS_PIN          GPIO_Pin_4
 #define STPM33_SCK_PIN         GPIO_Pin_5
 #define STPM33_MOSI_PIN        GPIO_Pin_7
 #define STPM33_MISO_PIN        GPIO_Pin_6
 #define STPM33_SYN_PIN         GPIO_Pin_1
+#define STPM33_EN_PIN          GPIO_Pin_11
 
 #define CRC_8                  (0x07)
 #define STPM33_FRAME_LEN       (5)
@@ -41,6 +44,8 @@
 #define STPM_DSP_REG_15_ADDRESS        0x4A //C2 RMS and V2 RMS
 #define STPM_PH1_REG_5_ADDRESS         0x5C //PH1 active power
 #define STPM_PH1_REG_7_ADDRESS         0x60 //PH1 reactive power
+#define STPM_PH2_REG_5_ADDRESS         0x74
+#define STPM_PH2_REG_7_ADDRESS         78
 
 #define STPM_SUBMASK_POWER_ACTIVE      ((uint32_t)0x1FFFFFFF)
 #define STPM_SUBMASK_POWER_REACTIVE    ((uint32_t)0x1FFFFFFF)
@@ -49,7 +54,7 @@
 #define STPM_CURRENT_SHIFT             15
 
 /* refer to source code metrology of stpm33 */
-#define STPM_VOL_FACT_CH1              116247
+#define STPM_VOL_FACT_CH1              116274
 #define STPM_CUR_FACT_CH1              25934
 #define STPM_POW_FACT_CH1              30154605
 /******************************************************************************/
@@ -73,6 +78,7 @@ uint8_t CalcCRC8(uint8_t *pBuf);
 void Stpm33_Enable(void);
 void Stpm33_Disable (void);
 void delay(uint32_t pTime);
+
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
 /******************************************************************************/
@@ -82,28 +88,36 @@ extern void Stpm33_Init(void)
     SPI_InitTypeDef  SPI_InitStruct;
     /* initialize PA4 as CS */
     GPIO_InitStruct.GPIO_Pin   = STPM33_CS_PIN;
-    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_IPD;
+    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(STPM33_CS_PORT, &GPIO_InitStruct);
     /* initialize PA5 as SCK */
     GPIO_InitStruct.GPIO_Pin   = STPM33_SCK_PIN;
     GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_AF_PP;
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz;
     GPIO_Init(STPM33_SCK_PORT, &GPIO_InitStruct);
     /* initialize PA6 as MISO */
     GPIO_InitStruct.GPIO_Pin   = STPM33_MISO_PIN;
-    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
+    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_AF_PP;
     GPIO_Init(STPM33_MISO_PORT, &GPIO_InitStruct);
     /* initialize PA7 as MOSI */
     GPIO_InitStruct.GPIO_Pin   = STPM33_MOSI_PIN;
     GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_AF_PP;
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz;
     GPIO_Init(STPM33_MOSI_PORT, &GPIO_InitStruct);
     /* initialize PB1 as SYN */
     GPIO_InitStruct.GPIO_Pin   = STPM33_SYN_PIN;
     GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(STPM33_SYN_PORT, &GPIO_InitStruct);
+    /* initialize PA11 as EN */
+    GPIO_InitStruct.GPIO_Pin   = STPM33_EN_PIN;
+    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(STPM33_EN_PORT, &GPIO_InitStruct);
+    GPIO_PinLockConfig(STPM33_MISO_PORT, STPM33_MISO_PIN);
+    GPIO_PinLockConfig(STPM33_MOSI_PORT, STPM33_MOSI_PIN);
+    GPIO_PinLockConfig(STPM33_SCK_PORT, STPM33_SCK_PIN);
     /* initialize SPI */
     SPI_InitStruct.SPI_Mode              = SPI_Mode_Master;
     SPI_InitStruct.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;
@@ -111,14 +125,21 @@ extern void Stpm33_Init(void)
     SPI_InitStruct.SPI_CPOL              = SPI_CPOL_High;
     SPI_InitStruct.SPI_CPHA              = SPI_CPHA_2Edge;
     SPI_InitStruct.SPI_NSS               = SPI_NSS_Soft;
-    SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
+    SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
     SPI_InitStruct.SPI_FirstBit          = SPI_FirstBit_MSB;
     SPI_InitStruct.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI1, &SPI_InitStruct);
     SPI_Cmd(SPI1,ENABLE);
     GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
-    GPIO_SetBits(STPM33_CS_PORT, STPM33_CS_PIN);
     
+    Stpm33_Enable();
+    GPIO_SetBits(STPM33_EN_PORT, STPM33_EN_PIN);
+    delay1(200);
+    GPIO_ResetBits(STPM33_EN_PORT, STPM33_EN_PIN);
+    delay1(200);
+    
+    Stpm33_Disable();
+   
 }
 
 uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
@@ -128,30 +149,38 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	uint32_t vTemp = 0;
 	uint8_t i = 0;
 	vBuffer[0]  = pAddr;
-	vBuffer[1]	= 0xFF; // dummy write address
-	vBuffer[2]	= 0xFF;
-	vBuffer[3]	= 0xFF;
+	vBuffer[1]	= 0x05;
+	vBuffer[2]	= 0x80;
+	vBuffer[3]	= 0x00;
 	vBuffer[4]	= CalcCRC8(vBuffer);
+    GPIO_ResetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
+    delay1(1);
+    GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
 	Stpm33_Enable();
-	delay(350);
+
+	
 	for (i = 0; i < 5; i++){
 			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
 	}
+    
 	Stpm33_Disable();
-	delay(350*2);
+    vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
+	delay1(10);
 	vBuffer[0]  = 0xFF; // dummy read address
 	vBuffer[1]	= 0xFF; // dummy write address
-	vBuffer[2]	= 0xFF; // dummy data
-	vBuffer[3]	= 0xFF; // dummy data
+	vBuffer[2]	= 0xAA; // dummy data
+	vBuffer[3]	= 0x55; // dummy data
 	vBuffer[4]	= CalcCRC8(vBuffer);
+
 	Stpm33_Enable();
-	delay(350);
+
 	for (i = 0; i < 5; i++){
 			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
 	}
 	Stpm33_Disable();
+
 	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
-	
+	delay1(10);
 	return vTemp;
 }
 
@@ -186,9 +215,7 @@ uint32_t Stpm33_ReadCur (void)
     cal_data = cal_data * 10;
     /* Shift calcul result to 17 bits ( resolution of Reg inside metrology block)*/
     cal_data >>= 17;  
-    return (uint32_t)cal_data;
-    /* Calculate real values with factors */
-    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+    return (uint32_t)cal_data;   
 }
 
 uint32_t Stpm33_ReadPowerActive (void)
@@ -240,6 +267,7 @@ int Stpm33_SetAutoLatch (void)
     vBuffer[2] = 0x80; // low byte of data want to write
     vBuffer[3] = 0x00; // high byte of data want to write
 	vBuffer[4]	= CalcCRC8(vBuffer);
+
 	Stpm33_Enable();
 	delay(350);
 	for (i = 0; i < 5; i++){
@@ -247,12 +275,12 @@ int Stpm33_SetAutoLatch (void)
 	}
 	Stpm33_Disable();
 	delay(350*2);
-
+    vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0]; 
     /* read dsp_cr3 for checking */
-    vBuffer[0] = STPM_DSP_CR_3_ADDRESS;
+    vBuffer[0]  = STPM_DSP_CR_3_ADDRESS;
 	vBuffer[1]	= 0xFF; // dummy write address
-	vBuffer[2]	= 0xFF; // dummy data
-	vBuffer[3]	= 0xFF; // dummy data
+	vBuffer[2]	= 0xAA; // dummy data
+	vBuffer[3]	= 0x55; // dummy data
 	vBuffer[4]	= CalcCRC8(vBuffer);
 	Stpm33_Enable();
 	delay(350);
@@ -261,7 +289,20 @@ int Stpm33_SetAutoLatch (void)
 	}
 	Stpm33_Disable();
     
-	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
+	vBuffer[0]  = 0xFF; // dummy read address
+	vBuffer[1]	= 0xFF; // dummy write address
+	vBuffer[2]	= 0xAA; // dummy data
+	vBuffer[3]	= 0x55; // dummy data
+	vBuffer[4]	= CalcCRC8(vBuffer);
+    vBufferRecv[1] = 0x02;
+	Stpm33_Enable();
+	delay(350);
+	for (i = 0; i < 5; i++){
+			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
+	}
+	Stpm33_Disable();
+	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];    
+    
     
     if (vTemp == 0x008004E0)
     {
@@ -271,6 +312,18 @@ int Stpm33_SetAutoLatch (void)
     {
         return -1;
     }
+}
+
+void Stpm33_Calib (void)
+{
+    /* set current gain */
+    /* write to 16 bit [31:16] of DFE_CR1, set bit 26 and 27, the other set as default */
+    Stpm33_WriteRegister((STPM_DFE_CR_1_ADDRESS + 1) , 0x0F27);
+    
+    /* calib CHV1 */
+    Stpm33_WriteRegister(STPM_DSP_CR_5_ADDRESS, 0x0741);
+    /* calib CHC1 */
+    Stpm33_WriteRegister(STPM_DSP_CR_6_ADDRESS, 0x0985); 
 }
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */
@@ -323,6 +376,7 @@ uint8_t Stpm33_Transfer(uint8_t pData)
 	while (SPI1->SR & (SPI_I2S_FLAG_BSY));
 	// Return received data from SPI data register
 	return SPI1->DR;
+    
 }
 
 void delay(uint32_t pTime)
@@ -330,3 +384,23 @@ void delay(uint32_t pTime)
 	while(pTime--);
 }
 
+void Stpm33_WriteRegister (uint8_t pAddr, uint16_t pData)
+{
+    uint8_t vBuffer[5];
+    uint8_t vBufferRecv[5];
+    uint8_t i = 0;
+//    uint32_t vTemp; 
+    /* send reg addr and data to write */
+    vBuffer[0] = 0xFF; //dummy addr to read
+    vBuffer[1] = pAddr;
+    vBuffer[2] = pData & 0xFF;
+    vBuffer[3] = (pData >> 8) & 0xFF;
+    vBuffer[4] = CalcCRC8(vBuffer);
+	Stpm33_Enable();
+	delay(350);
+	for (i = 0; i < 5; i++){
+			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
+	}
+	Stpm33_Disable();
+	delay(350*2);
+}

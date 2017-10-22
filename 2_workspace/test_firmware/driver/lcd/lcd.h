@@ -35,6 +35,8 @@ void LCD_Clear(void);
 void LCD_Init (void);
 void LCD_Puts(uint8_t x, uint8_t y, char* str);
 void LCD_DelayUs (uint32_t pUs);
+void LCD_DisplayNum (uint8_t x, uint8_t y, uint32_t pNum);
+void delay1 (uint32_t us);
 #endif 
 /******************************************************************************/
 /**!                           END OF FILE                                    */

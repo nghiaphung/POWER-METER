@@ -37,6 +37,8 @@ uint32_t Stpm33_ReadCur (void);
 uint32_t Stpm33_ReadPowerActive (void);
 uint32_t Stpm33_ReadPowerReactive (void);
 int Stpm33_SetAutoLatch (void);
+void Stpm33_Calib (void);
+void Stpm33_WriteRegister (uint8_t pAddr, uint16_t pData);
 #endif 
 /******************************************************************************/
 /**!                           END OF FILE                                    */

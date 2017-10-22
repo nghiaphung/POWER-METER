@@ -13,7 +13,6 @@
 /******************************************************************************/
 /**!                            LOCAL TYPEDEF                                 */
 /******************************************************************************/
-#define BR115200		       115200
 #define SERIAL_DEBUG_TX_PIN          GPIO_Pin_9
 #define SERIAL_DEBUG_RX_PIN          GPIO_Pin_10
 #define SERIAL_DEBUG_PORT            GPIOA
@@ -107,7 +106,7 @@ extern void Serial_Init(serial_t* serial)
     _serial_callback = serial->callback;
     
 }
-void Serial_Send(char* ptr, int len)
+void Serial_Send(uint8_t* ptr, int len)
 {
     int i = 0;
     for (i = 0; i < len; i++)

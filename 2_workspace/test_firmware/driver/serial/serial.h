@@ -55,7 +55,7 @@ typedef struct
 /******************************************************************************/
 void Serial_Init(serial_t* serial);
 void Serial_SendByte(uint8_t byte);
-void Serial_Send(char* ptr, int len);
+void Serial_Send(uint8_t* ptr, int len);
 int Serial_Available(void);
 uint8_t Serial_ReadRxBuffer(void);
 #endif 

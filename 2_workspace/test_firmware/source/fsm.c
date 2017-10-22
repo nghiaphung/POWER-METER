@@ -17,6 +17,13 @@
 #define STATE_ERROR           2
 
 typedef enum {
+    TYPE_REQUEST   = 1,
+    TYPE_RESPOND   = 2,
+    TYPE_PING      = 3,
+    TYPE_EMERGENCY = 4,
+}frame_type_t;
+
+typedef enum {
     SFD      = 0,
     DEVICEID = SFD + 1,
     SEQ      = DEVICEID + 1,
@@ -32,7 +39,6 @@ typedef enum {
     CMD_GET_ONOFF      = 0x42,
     CMD_GET_UI         = 0x43,
     CMD_GET_PQ         = 0x44,
-    CMD_GET_COS        = 0x45,
     CMD_SET_RTC        = 0x49,
 }cmd_t;
 /******************************************************************************/
@@ -115,9 +121,19 @@ void Serial_Debug_Update(uint8_t byte)
 /******************************************************************************/
 void fsm_SerialCmdProc (void)
 {
+    gState = STATE_IDLE;
+    uint8_t TxBuffer[28];
+    uint32_t Data = 0;
+    /* prepare buffer */
+    TxBuffer[SFD]  = 0x7F;
+    TxBuffer[TYPE] = TYPE_RESPOND;
+    TxBuffer[DEVICEID] = ProcBuffer[DEVICEID];
+    TxBuffer[DEVICEID+1] = ProcBuffer[DEVICEID+1];
+    TxBuffer[CMD] = ProcBuffer[CMD];
+    
     if (ProcBuffer[SFD] != 0x7F)
     {
-        return;
+        TxBuffer[ERR] = 0x01;
     }
     else
     {
@@ -128,16 +144,37 @@ void fsm_SerialCmdProc (void)
             case CMD_GET_ONOFF:
                 break;
             case CMD_GET_UI:
+                Data = Stpm33_ReadVol();
+                Data = Data / 100; // chi lay 1 chu so thap phan
+                TxBuffer[PARAM]   = Data & 0xFF;
+                TxBuffer[PARAM+1] = (Data >> 8) & 0xFF;
+                TxBuffer[PARAM+2] = (Data >> 16) & 0xFF;
+                
+                Data = Stpm33_ReadCur();
+                TxBuffer[PARAM+9]  = Data & 0xFF;
+                TxBuffer[PARAM+10] = (Data >> 8) & 0xFF;
+                TxBuffer[PARAM+11] = (Data >> 16) & 0xFF;
                 break;
+            
             case CMD_GET_PQ:
+                Data = Stpm33_ReadPowerActive();
+                Data = Data / 100; // chi lay 1 chu so thap phan
+                TxBuffer[PARAM]   = Data & 0xFF;
+                TxBuffer[PARAM+1] = (Data >> 8) & 0xFF;
+                TxBuffer[PARAM+2] = (Data >> 16) & 0xFF;
+                
+                Data = Stpm33_ReadPowerReactive();
+                Data = Data / 100; // chi lay 1 chu so thap phan
+                TxBuffer[PARAM+9]  = Data & 0xFF;
+                TxBuffer[PARAM+10] = (Data >> 8) & 0xFF;
+                TxBuffer[PARAM+11] = (Data >> 16) & 0xFF;                
                 break;
-            case CMD_GET_COS:
-                break;
+            
             case CMD_SET_RTC:
                 break;
             default:
                 break;
         }
     }
-
+    Serial_Send(TxBuffer, 28);
 }

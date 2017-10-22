@@ -107,7 +107,7 @@ void LCD_Cmd (uint8_t pCmd);
 void LCD_ENBlink (void);
 void LCD_GPIOInit (void);
 void LCD_DisplayOn (void);
-void LCD_SetCursor (uint8_t pRow, uint8_t pCol);
+void LCD_SetCursor (uint8_t pCol, uint8_t pRow);
 void LCD_Data (uint8_t data);
 void delay1 (uint32_t us);
 /******************************************************************************/
@@ -191,6 +191,83 @@ void LCD_Puts(uint8_t x, uint8_t y, char* str)
             LCD_Opts.currentX++;
         }
         str++;
+    }
+}
+
+void LCD_DisplayNum (uint8_t x, uint8_t y, uint32_t pNum)
+{
+    uint32_t temp;
+    LCD_SetCursor(x, y);
+    if (pNum < 10)
+    {
+        LCD_Data(pNum + 0x30);
+    } 
+    else if ((pNum >= 10) && (pNum < 100))
+    {
+        temp = pNum / 10;
+        LCD_Data(temp + 0x30);
+        temp = pNum - temp * 10;
+        LCD_Data(temp + 0x30);
+    } 
+    else if ((pNum >= 100) && (pNum < 1000))
+    {
+        temp = pNum / 100;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 100;
+        temp = pNum / 10;
+        LCD_Data(temp + 0x30);
+        temp = pNum - temp * 10;
+        LCD_Data(temp + 0x30);
+      
+    } 
+    
+    else if ((pNum >= 1000) && (pNum < 10000))
+    {
+        temp = pNum / 1000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 1000;
+        temp = pNum / 100;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - (temp * 100);
+        temp = pNum / 10;
+        LCD_Data(temp + 0x30);
+        temp = pNum - temp * 10;
+        LCD_Data(temp + 0x30);          
+    }
+    else if ((pNum >= 10000) && (pNum < 100000))
+    {
+        temp = pNum / 10000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 10000;
+        temp = pNum / 1000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 1000;
+        temp = pNum / 100;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 100;
+        temp = pNum / 10;
+        LCD_Data(temp + 0x30);
+        temp = pNum - temp * 10;
+        LCD_Data(temp + 0x30);         
+    }
+    else if ((pNum >= 100000) && (pNum < 1000000))
+    {
+        temp = pNum / 100000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 100000;
+        temp = pNum / 10000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 10000;
+        temp = pNum / 1000;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 1000;
+        temp = pNum / 100;
+        LCD_Data(temp + 0x30);
+        pNum = pNum - temp * 100;
+        temp = pNum / 10;
+        LCD_Data(temp + 0x30);
+        temp = pNum - temp * 10;
+        LCD_Data(temp + 0x30);        
     }
 }
 /******************************************************************************/
@@ -329,5 +406,19 @@ void delay1 (uint32_t us)
     SysTick->CTRL = 0xFFFFFFF5;
     while(SysTick->VAL);
     SysTick->CTRL = 0xFFFFFFF0;
+}
+
+void LCD_Display1Num (uint8_t data)
+{
+    LCD_Data(data + 0x30);
+}
+
+void LCD_Display2Num (uint8_t data)
+{
+    uint8_t temp;
+    temp = data / 10;
+    LCD_Data(temp + 0x30);
+    temp = data - temp * 10;
+    LCD_Data(temp + 0x30);
 }
 
