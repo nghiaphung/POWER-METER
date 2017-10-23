@@ -56,11 +56,11 @@ uint8_t gState = STATE_IDLE;
 uint8_t RxBuffer[128];
 uint8_t ProcBuffer[28];
 static uint16_t vTimeoutCount;
-uint8_t Timeout_Run;
+uint8_t Timeout_Run = 0;
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
-
+void fsm_SerialCmdProc (void);
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
 /******************************************************************************/
@@ -70,40 +70,40 @@ void fsm_Update (void)
     {
         vTimeoutCount++;
     }
-    if (RxBuffer[0] == 28)
-    {
-        /* reset buffer */
-        RxBuffer[0] = 0;
-        /* stop timeout */
-        Timeout_Run = 0;
-        memcpy(&ProcBuffer, &RxBuffer[1], 28);
-        
-        /* set state for fsm */
-        gState = STATE_CMD;
-    }
+
     if (vTimeoutCount > 5000)
     {
+        /* stop timeout */
         Timeout_Run = 0;
-        gState = STATE_ERROR;
+        vTimeoutCount = 0;
+        if (RxBuffer[0] == 28)
+        {
+            memcpy(&ProcBuffer, &RxBuffer[1], 28);
+            /* set state for fsm */
+            gState = STATE_CMD;
+        }
+        else
+        {
+            gState = STATE_ERROR;
+        }
+        /* reset buffer */
+        RxBuffer[0] = 0;
     }
-        
-        
-    
 }
 void fsm_Run (void)
 {
     switch (gState)
     {
         case STATE_CMD:
-            Led_SetLevel(LED_G, LED_LEVEL_ENABLE);
-        break;
+            fsm_SerialCmdProc();
+            break;
         case STATE_ERROR:
             
-        break;
+            break;
         
         case STATE_IDLE:
             
-        break;
+            break;
         default: break;
     }
 }
