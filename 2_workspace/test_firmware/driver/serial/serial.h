@@ -1,8 +1,4 @@
 /*******************************************************************************
- * @filename: 
- * @Author	: 
- * @Date	: 
- * @Email	: 
  ******************************************************************************/
 #ifndef SERIAL_H_
 #define SERIAL_H_
@@ -14,28 +10,8 @@
 /******************************************************************************/
 /*                             PUBLIC TYPEDEF                                 */
 /******************************************************************************/
-typedef enum
-{
-    Serial_Debug    = 1,
-    Serial_Wifi     = 2,
-    Serial_PLC      = 3,
-}USARTx_t;
-typedef enum
-{
-	SERIAL_BAUDRATE_115200 = 115200UL,
-	SERIAL_BAUDRATE_460800 = 460800UL,
-	SERIAL_BAUDRATE_921600 = 921600UL
-}baudrate_t;
 
 typedef void (*serial_callback_t)(uint8_t byte);
-
-typedef struct
-{
-    USARTx_t          usart;       
-	baudrate_t        baudrate;
-	serial_callback_t callback;
-}serial_t;
-
 
 
 /******************************************************************************/
@@ -53,7 +29,7 @@ typedef struct
 /******************************************************************************/
 /**!                    PUBLIC FUNCTIONS PROTOTYPES                           */
 /******************************************************************************/
-void Serial_Init(serial_t* serial);
+void Serial_Init(void);
 void Serial_SendByte(uint8_t byte);
 void Serial_Send(uint8_t* ptr, int len);
 int Serial_Available(void);

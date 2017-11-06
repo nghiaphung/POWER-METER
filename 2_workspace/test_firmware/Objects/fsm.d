@@ -23,3 +23,4 @@
 .\objects\fsm.o: C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc\misc.h
 .\objects\fsm.o: source\../driver/stpm33/stpm33.h
 .\objects\fsm.o: source\../driver/led/led.h
+.\objects\fsm.o: source\../driver/lcd/lcd.h

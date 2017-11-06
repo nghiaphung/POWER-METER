@@ -1,20 +1,15 @@
 /*******************************************************************************
- * @filename: ir.h
- * @Author	: nghiaphung
- * @Date	: 24/9/2017
- * @Email	: ducnghia318@gmail.com
  ******************************************************************************/
  
 /******************************************************************************/
 /**!                               INCLUDE                                    */
 /******************************************************************************/
-/* Standard includes. */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 /* driver includes */
 #include "stm32f10x_conf.h"
-//#include "stm32f10x_map.h"
 #include "stm32f10x_rcc.h"
 #include "driver/led/led.h"
 #include "system_stm32f10x.h"
@@ -39,7 +34,7 @@
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
-void hwSetup(void);
+void Init_Hardware(void);
 
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
@@ -48,60 +43,38 @@ void hwSetup(void);
 int main (void)
 {
     uint32_t data;
-    hwClockConfig();
 
-    hwSetup();
-
-    data = Stpm33_ReadRegister(0x18);
+    Clock_Config();
+    Init_Hardware();
     Stpm33_WriteRegister(0x05, 0x0080);
     data = Stpm33_ReadRegister(0x04);
-
-    data = Stpm33_ReadRegister(0x48);
-    data = Stpm33_ReadPowerActive();
+    if ((data & 0x00800000) == 0x00800000)
+        Led_SetLevel(LED_G, LED_LEVEL_DISABLE);
       
     while(1)
     {   
         fsm_Update();
         fsm_Run();
-//        for (int i=0; i < 4000000; i++);
-//        LCD_Clear();
-//        data = Stpm33_ReadVol();
-//        LCD_Puts(0,0, "U= ");
-//        LCD_DisplayNum(4, 0, data);
-//        data = Stpm33_ReadCur();
-//        LCD_Puts(0, 1, "I= ");
-//        LCD_DisplayNum(4,1, data);
-//        data = Stpm33_ReadPowerActive();
-//        LCD_Puts(0, 2, "P= ");
-//        LCD_DisplayNum(4, 2, data);
-//        data = Stpm33_ReadPowerReactive();
-//        LCD_Puts(0, 3, "Q= ");
-//        LCD_DisplayNum(4, 3, data);   
     }
 }
 
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */
 /******************************************************************************/
-void hwSetup(void)
+void Init_Hardware(void)
 {
-    serial_t debug_serial;    
-    debug_serial.baudrate = SERIAL_BAUDRATE_115200;
-    debug_serial.callback = Serial_Debug_Update;
-    debug_serial.usart    = Serial_Debug;
-
-    /* Initialize LEDs driver */
-    Led_Init();
     /* Initialize STPM33 driver */
     Stpm33_Init();
+    
+    /* Initialize LEDs driver */
+    Led_Init();
+
+    /* calib stpm33 to read right value */
     Stpm33_Calib();
     /* Initialize Serial drivers */
-    Serial_Init(&debug_serial);
+    Serial_Init();
     /* Initialized LCD */
-    LCD_Init();
-
-
-    
+    LCD_Init();  
 }
 
 

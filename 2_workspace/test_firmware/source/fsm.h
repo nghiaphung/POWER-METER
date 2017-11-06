@@ -1,8 +1,4 @@
 /*******************************************************************************
- * @filename: StateMachine.h
- * @Author	: nghiaphung
- * @Date	: 27/9/2017
- * @Email	: ducnghia318@gmail.com
  ******************************************************************************/
 #ifndef STATE_MACHINE_H_
 #define STATE_MACHINE_H_
@@ -14,6 +10,7 @@
 #include "../driver/serial/serial.h"
 #include "../driver/stpm33/stpm33.h"
 #include "../driver/led/led.h"
+#include "../driver/lcd/lcd.h"
 /******************************************************************************/
 /*                             PUBLIC TYPEDEF                                 */
 /******************************************************************************/

@@ -19,7 +19,6 @@
 #define LED_G_PIN         GPIO_Pin_10
 #define LED_Y_PIN         GPIO_Pin_9
 
-/* Symbol to convert active value */
 #define LED_ACTIVE_STAGE  1
 /******************************************************************************/
 /**!                            LOCAL SYMBOLS                                 */
@@ -31,7 +30,6 @@
 extern void Led_Init (void)
 {
     
-    /* user data configuration */
     GPIO_InitTypeDef GPIO_InitStruct;
     /* data initialization for GPIO */
     GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_PP;
@@ -53,8 +51,7 @@ extern void Led_Init (void)
 
 extern void Led_SetLevel (led_channel_t pLed, led_level_t pLevel)
 {
-    /* Local variables */
-    GPIO_TypeDef* GPIOx = ((void*)0); // set GPIOx to NULL;
+    GPIO_TypeDef* GPIOx = ((void*)0);
     uint16_t GPIO_Pin = 0;
     uint8_t vOutput   = 0;
     switch (pLed)

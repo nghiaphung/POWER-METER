@@ -1,32 +1,29 @@
-/*
- * @filename: serial.c
- * @Author	: nghiaphung
- * @Date	: 24/9/2017
- * @Email	: ducnghia318@gmail.com
- */
- 
+
 /******************************************************************************/
 /**!                               INCLUDE                                    */
 /******************************************************************************/
 #include "serial.h"
-
+#include "../../source/fsm.h"
 /******************************************************************************/
 /**!                            LOCAL TYPEDEF                                 */
 /******************************************************************************/
-#define SERIAL_DEBUG_TX_PIN          GPIO_Pin_9
-#define SERIAL_DEBUG_RX_PIN          GPIO_Pin_10
-#define SERIAL_DEBUG_PORT            GPIOA
-#define USART_DEBUG                  USART1
+#define SERIAL_TX_PIN          GPIO_Pin_9
+#define SERIAL_RX_PIN          GPIO_Pin_10
+#define SERIAL_PORT            GPIOA
+#define USART                  USART1
 
-#define SERIAL_WIFI_TX_PIN           GPIO_Pin_2
-#define SERIAL_WIFI_RX_PIN           GPIO_Pin_3
-#define SERIAL_WIFI_PORT             GPIOA
-#define USART_WIFI                   USART2
 
-#define SERIAL_PLC_TX_PIN            GPIO_Pin_10
-#define SERIAL_PLC_RX_PIN            GPIO_Pin_11
-#define SERIAL_PLC_PORT              GPIOC
-#define USART_PLC                    USART3
+#define UART1_TX		GPIO_Pin_9
+#define UART1_RX		GPIO_Pin_10
+#define UART1_PORT	GPIOA
+
+#define UART3_TX		GPIO_Pin_10
+#define UART3_RX		GPIO_Pin_11
+#define UART3_PORT	GPIOB
+
+#define UART2_TX		GPIO_Pin_2
+#define UART2_RX		GPIO_Pin_3
+#define UART2_PORT	GPIOA
 /******************************************************************************/
 /**!                            LOCAL SYMBOLS                                 */
 /******************************************************************************/
@@ -39,7 +36,8 @@
 /**!                          LOCAL VARIABLES                                 */
 /******************************************************************************/
 //uint8_t RxBuffer[256];
-serial_callback_t _serial_callback = ((void*)0);
+serial_callback_t Serial_callback = ((void*)0);
+uint32_t vDelay = 0;
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
@@ -47,64 +45,43 @@ serial_callback_t _serial_callback = ((void*)0);
 /******************************************************************************/
 /**!                        EXPORTED FUNCTIONS                                */
 /******************************************************************************/
-extern void Serial_Init(serial_t* serial)
+
+
+
+extern void Serial_Init(void)
 {
     uint16_t               TX_Pin, Rx_Pin;
-    GPIO_TypeDef*          Serial_Port;
-    USART_TypeDef*         USARTx;
     GPIO_InitTypeDef       GPIO_InitStruct;
     USART_InitTypeDef      UART_InitStruct;
     NVIC_InitTypeDef       NVIC_InitStruct;
+    
     /* initialize PA9 as TX */
-    switch(serial->usart)
-    {
-        case Serial_Debug:
-            TX_Pin      = SERIAL_DEBUG_TX_PIN;
-            Rx_Pin      = SERIAL_DEBUG_RX_PIN;
-            Serial_Port = SERIAL_DEBUG_PORT;
-            USARTx      = USART_DEBUG;
-            break;
-        case Serial_Wifi:
-            TX_Pin      = SERIAL_WIFI_TX_PIN;
-            Rx_Pin      = SERIAL_WIFI_RX_PIN;
-            Serial_Port = SERIAL_WIFI_PORT;
-            USARTx      = USART_WIFI;
-            break;
-        case Serial_PLC:
-            TX_Pin      = SERIAL_PLC_TX_PIN;
-            Rx_Pin      = SERIAL_PLC_RX_PIN;
-            Serial_Port = SERIAL_PLC_PORT;
-            USARTx      = USART_PLC;
-            break;
-        default: break;
-    }
-    GPIO_InitStruct.GPIO_Pin     = TX_Pin;
+    GPIO_InitStruct.GPIO_Pin     = SERIAL_TX_PIN;
     GPIO_InitStruct.GPIO_Mode    = GPIO_Mode_AF_PP;
     GPIO_InitStruct.GPIO_Speed   = GPIO_Speed_50MHz;
-    GPIO_Init(Serial_Port, &GPIO_InitStruct);
+    GPIO_Init(SERIAL_PORT, &GPIO_InitStruct);
     /* initialize PA10 as RX */
-    GPIO_InitStruct.GPIO_Pin     = Rx_Pin;
+    GPIO_InitStruct.GPIO_Pin     = SERIAL_RX_PIN;
     GPIO_InitStruct.GPIO_Mode    = GPIO_Mode_IN_FLOATING;
     GPIO_InitStruct.GPIO_Speed   = GPIO_Speed_50MHz;
-    GPIO_Init(Serial_Port, &GPIO_InitStruct);
+    GPIO_Init(SERIAL_PORT, &GPIO_InitStruct);
     /* initialize UART1 */
-    UART_InitStruct.USART_BaudRate             = serial->baudrate;
+    UART_InitStruct.USART_BaudRate             = 115200;
     UART_InitStruct.USART_WordLength           = USART_WordLength_8b;
     UART_InitStruct.USART_StopBits             = USART_StopBits_1;
     UART_InitStruct.USART_Parity               = USART_Parity_No;
     UART_InitStruct.USART_HardwareFlowControl  = USART_HardwareFlowControl_None;
     UART_InitStruct.USART_Mode                 = USART_Mode_Rx | USART_Mode_Tx;
     
-    USART_Init(USARTx, & UART_InitStruct);
-    USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE);
-    USART_Cmd( USARTx, ENABLE);
-    NVIC_InitStruct.NVIC_IRQChannel            = USART1_IRQn; //chua tong quat
+    USART_Init(USART1, & UART_InitStruct);
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+    USART_Cmd( USART1, ENABLE);
+    NVIC_InitStruct.NVIC_IRQChannel            = USART1_IRQn;
     NVIC_InitStruct.NVIC_IRQChannelCmd         = ENABLE;
     NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
     NVIC_Init(&NVIC_InitStruct);
-	//<! Initialize callback function    
-    _serial_callback = serial->callback;
-    
+	//setup callback    
+    Serial_callback = Serial_Debug_Update;
 }
 void Serial_Send(uint8_t* ptr, int len)
 {
@@ -119,17 +96,7 @@ void Serial_SendByte(uint8_t byte)
     USART_SendData(USART1, byte);
 }
 
-//int Serial_Available(void)
-//{
-//    return RxBuffer[0];
-//}
 
-//uint8_t Serial_ReadRxBuffer(void)
-//{
-//    uint8_t temp = RxBuffer[0];
-//    RxBuffer[0] -= 1;
-//    return RxBuffer[temp];
-//}
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */
 /******************************************************************************/
@@ -139,8 +106,8 @@ void USART1_IRQHandler (void)
     {
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
         uint8_t byte = (uint8_t) USART_ReceiveData(USART1) & 0xFF;
-        //<! Callback for upper layer
-        if (_serial_callback)
-            _serial_callback(byte);
+        //callback for processing
+        if (Serial_callback)
+            Serial_callback(byte);
     }
 }

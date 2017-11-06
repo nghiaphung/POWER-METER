@@ -1,11 +1,4 @@
-/*
- * @filename: stpm33.c
- * @Author	: nghiaphung
- * @Date	: 24/9/2017
- * @Email	: ducnghia318@gmail.com
- * @referrence : src firmware STPM3x aval by st, datasheet and app note of STPM33
- */
- 
+
 /******************************************************************************/
 /**!                               INCLUDE                                    */
 /******************************************************************************/
@@ -68,7 +61,8 @@
 /******************************************************************************/
 /**!                          LOCAL VARIABLES                                 */
 /******************************************************************************/
-
+uint8_t 	stmBufRecv[5];
+uint8_t 	stmBufSend[5];
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
@@ -88,7 +82,7 @@ extern void Stpm33_Init(void)
     SPI_InitTypeDef  SPI_InitStruct;
     /* initialize PA4 as CS */
     GPIO_InitStruct.GPIO_Pin   = STPM33_CS_PIN;
-    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_Out_OD;
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(STPM33_CS_PORT, &GPIO_InitStruct);
     /* initialize PA5 as SCK */
@@ -98,7 +92,7 @@ extern void Stpm33_Init(void)
     GPIO_Init(STPM33_SCK_PORT, &GPIO_InitStruct);
     /* initialize PA6 as MISO */
     GPIO_InitStruct.GPIO_Pin   = STPM33_MISO_PIN;
-    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_InitStruct.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
     GPIO_Init(STPM33_MISO_PORT, &GPIO_InitStruct);
     /* initialize PA7 as MOSI */
     GPIO_InitStruct.GPIO_Pin   = STPM33_MOSI_PIN;
@@ -127,7 +121,7 @@ extern void Stpm33_Init(void)
     SPI_InitStruct.SPI_NSS               = SPI_NSS_Soft;
     SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
     SPI_InitStruct.SPI_FirstBit          = SPI_FirstBit_MSB;
-    SPI_InitStruct.SPI_CRCPolynomial     = 7;
+    //SPI_InitStruct.SPI_CRCPolynomial     = 7;
     SPI_Init(SPI1, &SPI_InitStruct);
     SPI_Cmd(SPI1,ENABLE);
     GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
@@ -139,7 +133,7 @@ extern void Stpm33_Init(void)
     delay1(200);
     
     Stpm33_Disable();
-   
+  
 }
 
 uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
@@ -153,19 +147,20 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	vBuffer[2]	= 0x80;
 	vBuffer[3]	= 0x00;
 	vBuffer[4]	= CalcCRC8(vBuffer);
+    
+    // create latch to read data
     GPIO_ResetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
-    delay1(1);
+    delay(350); //delay 4us
     GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
+    
 	Stpm33_Enable();
-
-	
+    delay(350);
 	for (i = 0; i < 5; i++){
 			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
 	}
     
 	Stpm33_Disable();
-    vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
-	delay1(10);
+    delay(350*2);
 	vBuffer[0]  = 0xFF; // dummy read address
 	vBuffer[1]	= 0xFF; // dummy write address
 	vBuffer[2]	= 0xAA; // dummy data
@@ -173,15 +168,15 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	vBuffer[4]	= CalcCRC8(vBuffer);
 
 	Stpm33_Enable();
-
+    delay(350);
 	for (i = 0; i < 5; i++){
 			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
 	}
 	Stpm33_Disable();
 
 	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];
-	delay1(10);
 	return vTemp;
+
 }
 
 uint32_t Stpm33_ReadVol (void)
@@ -193,8 +188,8 @@ uint32_t Stpm33_ReadVol (void)
     /* raw voltage read from STPM33 */
     raw_data = raw_data & STPM_SUBMASK_VOLTAGE_RMS;
     /* Calculate real values with factors */
-    cal_data = (uint64_t)(raw_data * STPM_VOL_FACT_CH1);
-    /* multiply by 10 to have mili */
+    cal_data = (uint64_t)raw_data * STPM_VOL_FACT_CH1;
+    /* multiply by 10 to have mili vol */
     cal_data = cal_data * 10;
     /* Shift calcul result to 15 bits ( resolution of Reg inside metrology block)*/
     cal_data >>= 15;
@@ -211,7 +206,7 @@ uint32_t Stpm33_ReadCur (void)
     raw_data = (raw_data & STPM_SUBMASK_CURRENT_RMS) >> STPM_CURRENT_SHIFT;
     /* Calculate real values with factors */
     cal_data = (uint64_t)(raw_data * STPM_CUR_FACT_CH1);
-    /* multiply by 10 to have mili */
+    /* multiply by 10 to have mili ampe */
     cal_data = cal_data * 10;
     /* Shift calcul result to 17 bits ( resolution of Reg inside metrology block)*/
     cal_data >>= 17;  
@@ -229,7 +224,7 @@ uint32_t Stpm33_ReadPowerActive (void)
     raw_data <<= 4;  // handle sign extension
     raw_data >>= 4;
     /* Calculate real values with factors */
-    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+    cal_data = (uint64_t)raw_data * STPM_POW_FACT_CH1;    
     /* multiply by 10 to have mili */
     cal_data = cal_data * 10;
     /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
@@ -248,7 +243,7 @@ uint32_t Stpm33_ReadPowerReactive (void)
     raw_data <<= 4;  // handle sign extension
     raw_data >>= 4;
     /* Calculate real values with factors */
-    cal_data = (uint64_t)(raw_data * STPM_POW_FACT_CH1);    
+    cal_data = (uint64_t)raw_data * STPM_POW_FACT_CH1;    
     /* multiply by 10 to have mili */
     cal_data = cal_data * 10;
     /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
@@ -256,69 +251,12 @@ uint32_t Stpm33_ReadPowerReactive (void)
     return (uint32_t)cal_data;     
 }
 
-int Stpm33_SetAutoLatch (void)
-{
-    uint8_t vBuffer[5];
-    uint8_t vBufferRecv[5];
-    uint8_t i = 0;
-    uint32_t vTemp;
-    vBuffer[0] = 0xFF;
-    vBuffer[1] = 0x05; //address of bit [31:16] of dsp_cr3
-    vBuffer[2] = 0x80; // low byte of data want to write
-    vBuffer[3] = 0x00; // high byte of data want to write
-	vBuffer[4]	= CalcCRC8(vBuffer);
-
-	Stpm33_Enable();
-	delay(350);
-	for (i = 0; i < 5; i++){
-			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
-	}
-	Stpm33_Disable();
-	delay(350*2);
-    vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0]; 
-    /* read dsp_cr3 for checking */
-    vBuffer[0]  = STPM_DSP_CR_3_ADDRESS;
-	vBuffer[1]	= 0xFF; // dummy write address
-	vBuffer[2]	= 0xAA; // dummy data
-	vBuffer[3]	= 0x55; // dummy data
-	vBuffer[4]	= CalcCRC8(vBuffer);
-	Stpm33_Enable();
-	delay(350);
-	for (i = 0; i < 5; i++){
-			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
-	}
-	Stpm33_Disable();
-    
-	vBuffer[0]  = 0xFF; // dummy read address
-	vBuffer[1]	= 0xFF; // dummy write address
-	vBuffer[2]	= 0xAA; // dummy data
-	vBuffer[3]	= 0x55; // dummy data
-	vBuffer[4]	= CalcCRC8(vBuffer);
-    vBufferRecv[1] = 0x02;
-	Stpm33_Enable();
-	delay(350);
-	for (i = 0; i < 5; i++){
-			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
-	}
-	Stpm33_Disable();
-	vTemp = (vBufferRecv[3] << 24) + (vBufferRecv[2] << 16) + (vBufferRecv[1] << 8) + vBufferRecv[0];    
-    
-    
-    if (vTemp == 0x008004E0)
-    {
-        return 0;
-    }
-    else
-    {
-        return -1;
-    }
-}
 
 void Stpm33_Calib (void)
 {
     /* set current gain */
     /* write to 16 bit [31:16] of DFE_CR1, set bit 26 and 27, the other set as default */
-    Stpm33_WriteRegister((STPM_DFE_CR_1_ADDRESS + 1) , 0x0F27);
+    Stpm33_WriteRegister((STPM_DFE_CR_1_ADDRESS + 1) , 0x0327);
     
     /* calib CHV1 */
     Stpm33_WriteRegister(STPM_DSP_CR_5_ADDRESS, 0x0741);
@@ -328,8 +266,9 @@ void Stpm33_Calib (void)
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */
 /******************************************************************************/
+
+uint8_t CRC_u8Checksum;
 void Crc8Calc(uint8_t u8Data) {
-    uint8_t CRC_u8Checksum;
 	uint8_t loc_u8Idx;
 	uint8_t loc_u8Temp;
 	loc_u8Idx = 0;
@@ -345,7 +284,6 @@ void Crc8Calc(uint8_t u8Data) {
 }
 
 uint8_t CalcCRC8(uint8_t *pBuf) {
-    uint8_t CRC_u8Checksum;
 	uint8_t i;
 	CRC_u8Checksum = 0x00;
 	for (i = 0; i < STPM33_FRAME_LEN - 1; i++) {
@@ -353,7 +291,6 @@ uint8_t CalcCRC8(uint8_t *pBuf) {
 	}
 	return CRC_u8Checksum;
 }
-
 void Stpm33_Enable(void)
 {
     GPIO_ResetBits(STPM33_CS_PORT, STPM33_CS_PIN);
@@ -366,12 +303,13 @@ void Stpm33_Disable (void)
 
 uint8_t Stpm33_Transfer(uint8_t pData)
 {
+
     // Write data to be transmitted to the SPI data register
 	SPI1->DR = pData;
 	// Wait until transmit complete
 	while (!(SPI1->SR & (SPI_I2S_FLAG_TXE)));
 	// Wait until receive complete
-	while (!(SPI1->SR & (SPI_I2S_FLAG_RXNE)));
+	//while (!(SPI1->SR & (SPI_I2S_FLAG_RXNE)));
 	// Wait until SPI is not busy anymore
 	while (SPI1->SR & (SPI_I2S_FLAG_BSY));
 	// Return received data from SPI data register
@@ -389,18 +327,30 @@ void Stpm33_WriteRegister (uint8_t pAddr, uint16_t pData)
     uint8_t vBuffer[5];
     uint8_t vBufferRecv[5];
     uint8_t i = 0;
-//    uint32_t vTemp; 
     /* send reg addr and data to write */
-    vBuffer[0] = 0xFF; //dummy addr to read
+    vBuffer[0] = 0x00; //dummy addr to read
     vBuffer[1] = pAddr;
     vBuffer[2] = pData & 0xFF;
     vBuffer[3] = (pData >> 8) & 0xFF;
     vBuffer[4] = CalcCRC8(vBuffer);
 	Stpm33_Enable();
 	delay(350);
-	for (i = 0; i < 5; i++){
-			vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
+	for (i = 0; i < 5; i++)
+    {
+        vBufferRecv[i] = Stpm33_Transfer(vBuffer[i]);
 	}
 	Stpm33_Disable();
-	delay(350*2);
+    
+//	uint8_t i = 0;
+//	stmBufSend[0] = 0x00;
+//	stmBufSend[1]	= pAddr;
+//	stmBufSend[2]	= (pData & 0xFF);
+//	stmBufSend[3]	= pData >> 8;
+//	stmBufSend[4]	= CalcCRC8(stmBufSend);
+//	Stpm33_Enable();
+//	delay(350);
+//	for (i = 0; i < 5; i++){
+//			stmBufRecv[i] = Stpm33_Transfer(stmBufSend[i]);
+//	}
+//	Stpm33_Disable();
 }

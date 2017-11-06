@@ -19,3 +19,8 @@
 .\objects\serial.o: C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc\stm32f10x_tim.h
 .\objects\serial.o: C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc\stm32f10x_usart.h
 .\objects\serial.o: C:\Keil_v5\ARM\PACK\Keil\STM32F1xx_DFP\2.2.0\Device\StdPeriph_Driver\inc\misc.h
+.\objects\serial.o: driver\serial\../../source/fsm.h
+.\objects\serial.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\serial.o: driver\serial\../../source/../driver/stpm33/stpm33.h
+.\objects\serial.o: driver\serial\../../source/../driver/led/led.h
+.\objects\serial.o: driver\serial\../../source/../driver/lcd/lcd.h
