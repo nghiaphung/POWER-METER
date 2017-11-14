@@ -48,8 +48,6 @@ int main (void)
     Init_Hardware();
     Stpm33_WriteRegister(0x05, 0x0080);
     data = Stpm33_ReadRegister(0x04);
-    if ((data & 0x00800000) == 0x00800000)
-        Led_SetLevel(LED_G, LED_LEVEL_DISABLE);
       
     while(1)
     {   

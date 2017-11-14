@@ -219,13 +219,17 @@ void LCD_Update (void)
         temp = Stpm33_ReadVol();
         LCD_DisplayNum(4,0, temp);
         
-        LCD_Puts(0, 1, "I = ");
+        LCD_Puts(0, 1, "I= ");
         temp = Stpm33_ReadCur();
         LCD_DisplayNum(4, 1, temp);
         
-        LCD_Puts(0,2, "P=");
+        LCD_Puts(0,2, "P= ");
         temp = Stpm33_ReadPowerActive();
         LCD_DisplayNum(4,2, temp);
+        
+        LCD_Puts(0,3, "E= ");
+        temp = Stpm33_ReadEnergy();
+        LCD_DisplayNum(4,3, temp);
         
 //        LCD_DisplayNum(4, 0, (Vol_data[a]/100));
 //        LCD_Puts(12, 0, "V");

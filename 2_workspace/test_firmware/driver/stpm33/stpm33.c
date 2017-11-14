@@ -35,6 +35,7 @@
 #define STPM_DSP_CR_8_ADDRESS          0x0E //CHC2
 #define STPM_DSP_REG_14_ADDRESS        0x48 //C1 RMS and V1 RMS
 #define STPM_DSP_REG_15_ADDRESS        0x4A //C2 RMS and V2 RMS
+#define STPM_PH1_REG_1_ADDRESS         0x54 //active power
 #define STPM_PH1_REG_5_ADDRESS         0x5C //PH1 active power
 #define STPM_PH1_REG_7_ADDRESS         0x60 //PH1 reactive power
 #define STPM_PH2_REG_5_ADDRESS         0x74
@@ -48,8 +49,9 @@
 
 /* refer to source code metrology of stpm33 */
 #define STPM_VOL_FACT_CH1              116274
-#define STPM_CUR_FACT_CH1              25934
+#define STPM_CUR_FACT_CH1              25935
 #define STPM_POW_FACT_CH1              30154605
+#define STPM_ENE_FACT_CH1              17573 //= pow_fact/858
 /******************************************************************************/
 /**!                            LOCAL SYMBOLS                                 */
 /******************************************************************************/
@@ -61,8 +63,8 @@
 /******************************************************************************/
 /**!                          LOCAL VARIABLES                                 */
 /******************************************************************************/
-uint8_t 	stmBufRecv[5];
-uint8_t 	stmBufSend[5];
+int32_t energy_metro_data;
+int32_t energy_extension;
 /******************************************************************************/
 /**!                    LOCAL FUNCTIONS PROTOTYPES                            */
 /******************************************************************************/
@@ -148,10 +150,10 @@ uint32_t	Stpm33_ReadRegister(uint8_t pAddr)
 	vBuffer[3]	= 0x00;
 	vBuffer[4]	= CalcCRC8(vBuffer);
     
-    // create latch to read data
-    GPIO_ResetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
-    delay(350); //delay 4us
-    GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
+//    // create latch to read data
+//    GPIO_ResetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
+//    delay(350); //delay 4us
+//    GPIO_SetBits(STPM33_SYN_PORT, STPM33_SYN_PIN);
     
 	Stpm33_Enable();
     delay(350);
@@ -205,11 +207,13 @@ uint32_t Stpm33_ReadCur (void)
     /* raw voltage read from STPM33 */
     raw_data = (raw_data & STPM_SUBMASK_CURRENT_RMS) >> STPM_CURRENT_SHIFT;
     /* Calculate real values with factors */
-    cal_data = (uint64_t)(raw_data * STPM_CUR_FACT_CH1);
+    cal_data = (uint64_t)raw_data * STPM_CUR_FACT_CH1;
     /* multiply by 10 to have mili ampe */
     cal_data = cal_data * 10;
     /* Shift calcul result to 17 bits ( resolution of Reg inside metrology block)*/
     cal_data >>= 17;  
+    cal_data *= 1000;
+    cal_data /= 980;
     return (uint32_t)cal_data;   
 }
 
@@ -227,8 +231,11 @@ uint32_t Stpm33_ReadPowerActive (void)
     cal_data = (uint64_t)raw_data * STPM_POW_FACT_CH1;    
     /* multiply by 10 to have mili */
     cal_data = cal_data * 10;
+    cal_data = cal_data / 2;
     /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
     cal_data >>= 28;
+    cal_data *= 1000;
+    cal_data /= 980;
     return (uint32_t)cal_data;     
 }
 
@@ -246,22 +253,49 @@ uint32_t Stpm33_ReadPowerReactive (void)
     cal_data = (uint64_t)raw_data * STPM_POW_FACT_CH1;    
     /* multiply by 10 to have mili */
     cal_data = cal_data * 10;
+    cal_data = cal_data / 2;
     /* Shift calcul result to 28 bits ( resolution of Reg inside metrology block)*/
-    cal_data >>= 28;
+    cal_data >>= 28;  
     return (uint32_t)cal_data;     
-}
+}  
 
+int32_t Stpm33_ReadEnergy(void)
+{
+    int32_t raw_data;
+    int64_t cal_data;
+    /* read raw data from PH1_REG1 */
+    raw_data = Stpm33_ReadRegister(STPM_PH1_REG_1_ADDRESS);
+    if ((energy_metro_data > 0x60000000) && (raw_data < 0xA0000000))
+    {
+        energy_extension++;
+    }
+    if ((energy_metro_data < 0xA0000000) && (raw_data > 0x60000000))
+    {
+        energy_extension--;
+    }
+    /* save the new result from register inside data */
+    energy_metro_data = raw_data;
+    /* calculate the nrj value and add the 32 bit extension */
+    cal_data = (uint64_t)raw_data + ((int64_t)energy_extension << 32);
+    /* apply energy factor */
+    cal_data *= (int64_t)STPM_ENE_FACT_CH1;
+    /* multi by 10 to have milis */
+    cal_data *= 10;
+    /* put the result in 32bit format */
+    cal_data >>= 32;
+    return ((int32_t)cal_data);
+}
 
 void Stpm33_Calib (void)
 {
     /* set current gain */
     /* write to 16 bit [31:16] of DFE_CR1, set bit 26 and 27, the other set as default */
-    Stpm33_WriteRegister((STPM_DFE_CR_1_ADDRESS + 1) , 0x0327);
+    Stpm33_WriteRegister((STPM_DFE_CR_1_ADDRESS + 1) , 0x0327); //gain = 2
     
     /* calib CHV1 */
-    Stpm33_WriteRegister(STPM_DSP_CR_5_ADDRESS, 0x0741);
+    Stpm33_WriteRegister(STPM_DSP_CR_5_ADDRESS, 0x0800);
     /* calib CHC1 */
-    Stpm33_WriteRegister(STPM_DSP_CR_6_ADDRESS, 0x0985); 
+    Stpm33_WriteRegister(STPM_DSP_CR_6_ADDRESS, 0x0FFF); 
 }
 /******************************************************************************/
 /**!                          LOCAL FUNCTIONS                                 */

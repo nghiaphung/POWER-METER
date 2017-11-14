@@ -50,7 +50,6 @@ uint32_t vDelay = 0;
 
 extern void Serial_Init(void)
 {
-    uint16_t               TX_Pin, Rx_Pin;
     GPIO_InitTypeDef       GPIO_InitStruct;
     USART_InitTypeDef      UART_InitStruct;
     NVIC_InitTypeDef       NVIC_InitStruct;
